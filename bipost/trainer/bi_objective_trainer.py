@@ -6,7 +6,8 @@ from typing import Dict, List, Optional, Tuple, Union
 import torch
 from torch import nn
 from torch.optim import Optimizer
-from torch.utils.data import DistributedSampler
+# from torch.utils.data import DistributedSampler
+from bipost.utils.distributed_sampler import DistributedSampler
 from tqdm import tqdm
 
 
@@ -127,15 +128,21 @@ class BiObjTrainer(ABC):
         # flag to check whether sop learning criteria had met
         OPTIM_ACHIEVED = False
 
-        for epoch in range(self.epochs):
-            if isinstance(self.train_dataloader_1.sampler, DistributedSampler): # important todo: 1) shuffle logic of dataloader, maybe not shuffle here, only shuffle when dataloader is depleted
-                self.train_dataloader_1.sampler.set_epoch(epoch)
+        # Setup iterable train_dataloader
+        if isinstance(self.train_dataloader_1.sampler, DistributedSampler):
+            sample_shuffler_1 = 0
+            self.train_dataloader_1.sampler.set_epoch(sample_shuffler_1)
+            sample_shuffler_1 += 1
+        iter_train_dataloader_1 = iter(self.train_dataloader_1)
 
-            if isinstance(self.train_dataloader_2.sampler, DistributedSampler):
-                self.train_dataloader_2.sampler.set_epoch(epoch)
-            # Setup iterable train_dataloader
-            iter_train_dataloader_1 = iter(self.train_dataloader_1)
-            iter_train_dataloader_2 = iter(self.train_dataloader_2)
+        if isinstance(self.train_dataloader_2.sampler, DistributedSampler):
+            sample_shuffler_2 = 0
+            self.train_dataloader_2.sampler.set_epoch(sample_shuffler_2)
+            sample_shuffler_2 += 1
+        iter_train_dataloader_2 = iter(self.train_dataloader_2)
+
+        for epoch in range(self.epochs):
+
             step_bar = tqdm(
                 range(train_loader_len),
                 desc="Train step of epoch %d" % epoch,
@@ -167,16 +174,22 @@ class BiObjTrainer(ABC):
                     try:
                         data = next(iter_train_dataloader_1)
                     except StopIteration:
+                        if isinstance(self.train_dataloader_1.sampler, DistributedSampler):
+                            self.train_dataloader_1.sampler.set_epoch(sample_shuffler_1)
+                            sample_shuffler_1 += 1
                         iter_train_dataloader_1 = iter(self.train_dataloader_1) 
-                        data = next(iter_train_dataloader_1)      
+                        data = next(iter_train_dataloader_1) 
 
                 if obj_index==2:
                     loss_fn = self.loss_fn_2 
                     try:
                         data = next(iter_train_dataloader_2)
                     except StopIteration:
+                        if isinstance(self.train_dataloader_2.sampler, DistributedSampler):
+                            self.train_dataloader_2.sampler.set_epoch(sample_shuffler_2)
+                            sample_shuffler_2 += 1
                         iter_train_dataloader_2 = iter(self.train_dataloader_2)
-                        data = next(iter_train_dataloader_2)       
+                        data = next(iter_train_dataloader_2) 
                 
                 loss, logs_dict = self.calc_loss(loss_fn, data, obj_index)
 
