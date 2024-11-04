@@ -9,6 +9,7 @@ from torch.optim import Optimizer
 # from torch.utils.data import DistributedSampler
 from bipost.utils.distributed_sampler import DistributedSampler
 from tqdm import tqdm
+from bipost.models import Actor
 
 
 from bipost.models import DPOLoss, GPTLMLoss, KDLoss
@@ -141,6 +142,9 @@ class BiObjTrainer(ABC):
             sample_shuffler_2 += 1
         iter_train_dataloader_2 = iter(self.train_dataloader_2)
 
+        # setup objective sampling flag
+        sample_index = True
+
         for epoch in range(self.epochs):
 
             step_bar = tqdm(
@@ -163,7 +167,8 @@ class BiObjTrainer(ABC):
 
                 # Choose the objective to be updated
                 # syncironize the objective index across processes  
-                obj_index = np.random.choice([1, 2], p=prob_mass)
+                if sample_index:
+                    obj_index = np.random.choice([1, 2], p=prob_mass)
                 
                 # clear memory cache
                 if torch.cuda.is_available():
@@ -192,6 +197,9 @@ class BiObjTrainer(ABC):
                         data = next(iter_train_dataloader_2) 
                 
                 loss, logs_dict = self.calc_loss(loss_fn, data, obj_index)
+
+                # sample an index in the next step ONLY if the model is updated in this step (i.e. this step is gradient_accumulation_boundary)
+                sample_index = self.model.model.is_gradient_accumulation_boundary() if isinstance(self.model, Actor) else self.model.is_gradient_accumulation_boundary()
 
             #    # DEBUG
             #     if self.strategy.is_rank_0():
