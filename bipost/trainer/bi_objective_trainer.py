@@ -574,21 +574,9 @@ class BiObjTrainer(ABC):
         # eval
         eval_loss_1 = None
         eval_loss_2 = None
-        if global_step % args.eval_steps == 0 or global_step==1: #todo: make evaluation block neater
+        if global_step % args.eval_steps == 0 or global_step==1:
             eval_loss_1 = self.evaluate[self.args.obj_1](self.eval_dataloader_1, self.loss_fn_1, obj_index, global_step)
             eval_loss_2 = self.evaluate[self.args.obj_2](self.eval_dataloader_2, self.loss_fn_2, obj_index, global_step)
-            # if self.args.obj_1=="SFT":
-            #     eval_loss_1 = self.sft_evaluate(self.eval_dataloader_1, self.loss_fn_1, obj_index, global_step)
-            # elif self.args.obj_1=="DPO":
-            #     eval_loss_1 = self.dpo_evaluate(self.eval_dataloader_1, self.loss_fn_1, obj_index, global_step)
-            # elif self.args.obj_1=="KD":
-            #     eval_loss_1 = self.kd_evaluate(self.eval_dataloader_1, self.loss_fn_1, obj_index, global_step)
-            # if self.args.obj_2=="SFT":
-            #     eval_loss_2 = self.sft_evaluate(self.eval_dataloader_2, self.loss_fn_2, obj_index, global_step)
-            # elif self.args.obj_2=="DPO":
-            #     eval_loss_2 = self.dpo_evaluate(self.eval_dataloader_2, self.loss_fn_2, obj_index, global_step)
-            # elif self.args.obj_2=="KD":
-            #     eval_loss_2 = self.kd_evaluate(self.eval_dataloader_2, self.loss_fn_2, obj_index, global_step)
         # save ckpt
         if global_step % args.save_steps == 0:
             tag = f"global_step{global_step}"
