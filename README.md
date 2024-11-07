@@ -1,5 +1,5 @@
 <div align="center">
-    <img alt="BIPOST logo" src="./docs/bipost_logo.PNG" style="width: 500px;" />
+    <img alt="BIPOST logo" src="./docs/bipost_logo.PNG" style="width: 1000px;" />
 </div>
 
 <hr>
