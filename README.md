@@ -29,19 +29,19 @@ TBD
 
 ## Installation
 
-Create conda environment
+1. Create conda environment
 
 ```bash
 conda create -n bipost python=3.10
 conda activate bipost
 ```
 
-Clone the repository
+2. Clone the repository
 ```bash
 git clone https://github.com/Post-LLM/BIPOST.git
 ```
 
-To install BIPOST, Navigate to the top-level of the repo and run
+3. To install BIPOST, Navigate to the top-level of the repo and run
 ```bash
 pip install -e .
 ```
