@@ -1,4 +1,8 @@
-# BiPOST: A Python Library for Efficient Bi-objective LLM Post-training
+<div align="center">
+    <img alt="BIPOST logo" src="./docs/bipost_logo.png" style="height: 110px;" />
+</div>
+
+<hr>
 
 A computationally efficient framework for of LLM post-training involving bi-objective and bilevel fine-tuning.
 
