@@ -9,7 +9,7 @@ A computationally efficient framework for of LLM post-training involving bi-obje
 <div align="center">
     <img alt="BIPOST framework" src="./docs/bipost_framework.PNG" style="height: 280px;" />
 </div>
-<br/><br/>
+<br/>
 
 ## Introduction
 
