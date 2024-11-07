@@ -28,7 +28,7 @@ conda activate bipost
 To install bipost, navigate to the top-level of the repo and run
 ```bash
 pip install -e .
-``
+```
 
 ## Acknowledgement
 
