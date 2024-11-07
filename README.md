@@ -19,6 +19,8 @@ preference learning (e.g., with DPO or RLHF) and supervised fine-tuning (SFT). T
 
 - **Similar computational cost as sequential training**:
 
+- **Data filtering**:
+
 - **Flexibility**:
 
 ## Example Results
