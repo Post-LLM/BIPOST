@@ -36,7 +36,12 @@ conda create -n bipost python=3.10
 conda activate bipost
 ```
 
-To install bipost, navigate to the top-level of the repo and run
+Clone the repository
+```bash
+git clone https://github.com/Post-LLM/BIPOST.git
+```
+
+To install BIPOST, Navigate to the top-level of the repo and run
 ```bash
 pip install -e .
 ```
