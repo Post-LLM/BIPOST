@@ -19,6 +19,8 @@ We introduce BiPOST, a computationally efficient implementation of a bi-objectiv
 
 - **Similar computational cost as sequential training**:
 
+- **Flexibility**:
+
 ## Installation
 
 Create conda environment
