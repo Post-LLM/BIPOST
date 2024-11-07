@@ -12,16 +12,16 @@ A computationally efficient framework for of LLM post-training involving bi-obje
 
 ## Introduction
 
-preference learning (e.g., with DPO or RLHF) and supervised fine-tuning (SFT). The common sequential approach treats each stage independently, but this can cause the model to forget the first objective when optimizing for the second. We introduce BiPOST, a computationally efficient implementation of a bi-objective/bilevel LLM post-training framework that enhances model performance compared to single-objective/single-level LLM training. BiPOST offers a one-stop LLM tuning framework: a pre-trained LLM is optimized for bi-objective in one stage, with comparable memory and runtime cost to sequentially optimizing each objective.
+Preference learning (e.g., with DPO or RLHF) and supervised fine-tuning (SFT). The common sequential approach treats each stage independently, but this can cause the model to forget the first objective when optimizing for the second. We introduce BiPOST, a computationally efficient implementation of a bi-objective/bilevel LLM post-training framework that enhances model performance compared to single-objective/single-level LLM training. BiPOST offers a one-stop LLM tuning framework: a pre-trained LLM is optimized for bi-objective in one stage, with comparable memory and runtime cost to sequentially optimizing each objective.
 
+- **Flexibility**: The combination of objectives is flexible and is not limited to the popular case of direct preference optimization (DPO) and supervised fine-tuning (SFT). 
+  
+- **Data filtering**: In addition to simultaneous bi-objective learning, BiPOST offers an optional bi-level data filtering/selection function that automatically filters out low-quality data given a user-specified golden dataset.
 
-- **Improved post-training performance**: 
+- **Improved post-training performance**: As compared to sequential training, BiPOST offers better performance as it mitigates the forgetting issue.
 
-- **Similar computational cost as sequential training**:
+- **Similar computational cost as sequential training**: Although the forgetting issue is mitigated using simultaneous learning of bi-objective, the computational resource usage is comparable to that of traditional sequential training.
 
-- **Data filtering**:
-
-- **Flexibility**:
 
 ## Example Results
 
@@ -43,7 +43,7 @@ conda activate bipost
 git clone https://github.com/Post-LLM/BIPOST.git
 ```
 
-3. To install BIPOST, Navigate to the top-level of the repo and run
+3. To install BiPOST, Navigate to the top-level of the repo and run
 ```bash
 pip install -e .
 ```
