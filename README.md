@@ -1,4 +1,4 @@
-# BiPOST: A Library for Efficient Bi-objective LLM Post-training
+# BiPOST: A Python Library for Efficient Bi-objective LLM Post-training
 
 A computationally efficient framework for of LLM post-training involving bi-objective and bilevel fine-tuning.
 
@@ -14,5 +14,25 @@ We introduce BiPOST, a computationally efficient implementation of a bi-objectiv
 
 - **Improved post-training performance**: 
 
-- **Similar computational cost as sequential training**: 
+- **Similar computational cost as sequential training**:
 
+## Installation
+
+Create conda environment
+
+```bash
+conda create -n bipost python=3.10
+conda activate bipost
+```
+
+To install bipost, navigate to the top-level of the repo and run
+```bash
+pip install -e .
+``
+
+## Acknowledgement
+
+We would like to thank all packages this repo is built on, especially
+
+- [OpenRLHF](https://github.com/OpenRLHF/OpenRLHF): for the vanilla SFT and DPO implementation and their great extention capability.
+- [DeepSpeed](https://github.com/microsoft/DeepSpeed): for the efficient distributed training functions.
