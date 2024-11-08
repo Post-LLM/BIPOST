@@ -10,6 +10,54 @@ import torch
 from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
 
 
+def get_selector_train_ds_config( #bak
+    offload,
+    adam_offload=True,
+    stage=0,
+    bf16=False,
+    max_norm=10.0,
+    zpg=8,
+    grad_accum_dtype=None,
+    disable_trace_cache=False,
+):
+    device = "cpu" if offload else "none"
+    if stage:
+        zero_opt_dict = {
+            "stage": stage,
+            "offload_param": {"device": device},
+            "offload_optimizer": {
+                "device": "cpu" if adam_offload else "none",
+                "pin_memory": True,
+            },
+            "sub_group_size": "auto",
+            "stage3_max_live_parameters": "auto",
+            "stage3_max_reuse_distance": "auto",
+            "stage3_param_persistence_threshold": "auto",
+            "stage3_prefetch_bucket_size": "auto",
+            "reduce_bucket_size": "auto",
+            # ZeRO++
+            "zero_hpz_partition_size": zpg,
+            "zero_quantized_weights": False,
+            "zero_quantized_gradients": False,
+        }
+    else:
+        zero_opt_dict = {
+            "stage": stage,
+        }
+
+    return {
+        "steps_per_print": 100,
+        "zero_optimization": zero_opt_dict,
+        "bf16": {
+            "enabled": False,
+        },
+        "gradient_clipping": max_norm,
+        "prescale_gradients": False,
+        "wall_clock_breakdown": False,
+        "data_types": {"grad_accum_dtype": grad_accum_dtype if grad_accum_dtype else "fp32"},
+    }
+    
+
 def get_train_ds_config(
     offload,
     adam_offload=True,

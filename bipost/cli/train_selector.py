@@ -7,9 +7,9 @@ from datetime import datetime
 
 from transformers.trainer import get_scheduler
 
-from bipost.datasets import RewardDataset, SFTDataset
-from bipost.models import Actor
-from bipost.trainer import BiObjTrainer
+from bipost.datasets import RewardDataset, SFTDataset, SFTDatasetIndexed
+from bipost.models import Actor, TrainableTensorModule
+from bipost.trainer import BiObjTrainer, SelectorTrainer
 from bipost.utils import blending_datasets, get_strategy, get_tokenizer
 
 def get_datalaoders(strategy, obj_index, tokenizer):
@@ -111,24 +111,13 @@ def get_datalaoders(strategy, obj_index, tokenizer):
     return train_dataloader, eval_dataloader
 
 def train(args):
-    # process the referece pareto values needed for stopping criteria of MOO methods
-    if args.ref_pareto_1=="":
-        ref_pareto_front = [[0.0, 0.0]]
-    else:
-        ref_pareto_1 = [float(_) for _ in args.ref_pareto_1.split()]
-        ref_pareto_2 = [float(_) for _ in args.ref_pareto_2.split()]
-
-        assert len(ref_pareto_1)== len(ref_pareto_2)
-
-        ref_pareto_front = []
-        for _1, _2 in zip(ref_pareto_1, ref_pareto_2):
-            ref_pareto_front.append([_1, _2])
-
-
+    
     # configure strategy
     strategy = get_strategy(args)
     strategy.setup_distributed()
 
+    # configure model
+    # load huggingface model
     model = Actor(
         args.pretrain,
         use_flash_attention_2=args.flash_attn,
@@ -136,14 +125,21 @@ def train(args):
         load_in_4bit=args.load_in_4bit,
         lora_rank=args.lora_rank,
         lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
         target_modules=args.target_modules,
+        lora_dropout=args.lora_dropout,
         ds_config=strategy.get_ds_train_config(is_actor=True),
+        gradient_checkpointing=args.gradient_checkpointing,
     )
 
-    if args.ref_model:
+    # configure tokenizer
+    tokenizer = get_tokenizer(args.pretrain, model.model, "right", strategy, use_fast=not args.disable_fast_tokenizer)
+
+    strategy.print(model)
+    
+    # load weights for ref model
+    if args.ref_constant:
         ref_model = Actor(
-            args.ref_model,
+            args.pretrain,
             use_flash_attention_2=args.flash_attn,
             bf16=args.bf16,
             load_in_4bit=args.load_in_4bit,
@@ -151,25 +147,58 @@ def train(args):
         )
         if args.ref_offload:
             ref_model._offload = True
-        if args.ref_model_2:
-            ref_model_2 = Actor(
-                args.ref_model_2,
-                use_flash_attention_2=args.flash_attn,
-                bf16=args.bf16,
-                load_in_4bit=args.load_in_4bit,
-                ds_config=strategy.get_ds_eval_config(offload=args.ref_offload),
-        )
-            if args.ref_offload_2:
-                ref_model_2._offload = True
-        else:
-            ref_model_2=None
+        get_tokenizer(args.pretrain, ref_model.model, "right", strategy, use_fast=not args.disable_fast_tokenizer)
+        print("\n TODO: implement ref regularization. Right now there will be no reg.\n")
     else:
         ref_model=None
-        ref_model_2=None
 
-    # configure tokenizer
-    tokenizer = get_tokenizer(args.pretrain, model.model, "right", strategy, use_fast=not args.disable_fast_tokenizer)
-    strategy.print(model)
+    # configure optimizer
+    optim = strategy.create_optimizer(model, lr=args.learning_rate, betas=(0.9, 0.95), weight_decay=args.l2)
+
+    # prepare for data and dataset
+    train_dataloader, eval_dataloader = get_datalaoders(strategy,1,tokenizer)
+    data_2 = blending_datasets(
+        args.dataset_2,
+        "1",
+        strategy,
+        args.seed,
+        return_eval=False,
+        max_count=args.max_samples_2,
+    )
+    data_2 = data_2.select(range(min(args.max_samples_2, len(data_2))))
+    dataset_2 = SFTDatasetIndexed(
+        data_2,
+        tokenizer,
+        args.max_len_2,
+        strategy,
+        input_template=args.input_template_2,
+    )
+    
+    # initilize data selector
+    p = TrainableTensorModule(size=dataset_2.__len__(),activation=args.selector_activation)
+    p_opt=strategy.create_optimizer(p, lr=args.selector_learning_rate, betas=(0.9, 0.95), weight_decay=0.)
+    
+
+    train_dataloader_2 = strategy.setup_dataloader(
+        dataset_2, args.micro_train_batch_size, True, True, dataset_2.collate_fn
+    )
+
+    # scheduler
+    num_update_steps_per_epoch = len(train_dataloader) // strategy.accumulated_gradient
+    max_steps = math.ceil(args.max_epochs * num_update_steps_per_epoch)
+
+    scheduler = get_scheduler(
+        args.lr_scheduler,
+        optim,
+        num_warmup_steps=math.ceil(max_steps * 0.03),
+        num_training_steps=max_steps,
+    )
+    p_scheduler = get_scheduler(
+        args.selector_lr_scheduler,
+        p_opt,
+        num_warmup_steps=math.ceil(max_steps * 0.03),
+        num_training_steps=max_steps,
+    )
 
     # gradient_checkpointing
     if args.gradient_checkpointing:
@@ -177,62 +206,47 @@ def train(args):
             gradient_checkpointing_kwargs={"use_reentrant": args.gradient_checkpointing_use_reentrant}
         )
 
-    # configure optimizer
-    optim = strategy.create_optimizer(model, lr=args.learning_rate, betas=args.adam_betas, weight_decay=args.l2)
+    # # prepare models
+    # (model, optim, scheduler) = strategy.prepare((model, optim, scheduler))
+    # strategy prepare
+    ((model, optim, scheduler),(p,p_opt,p_scheduler)) = strategy.prepare((model, optim, scheduler),(p,p_opt,p_scheduler))
 
- 
-    train_dataloader_1, eval_dataloader_1 = get_datalaoders(strategy, 1, tokenizer)
-    train_dataloader_2, eval_dataloader_2 = get_datalaoders(strategy, 2, tokenizer)
+    # load checkpoint
+    if args.load_checkpoint:
+        strategy.print("Load checkpoint: ", args.save_path)
+    if args.save_path:
+        os.makedirs(args.save_path, exist_ok=True)
 
-    # scheduler #todo:enable non-constant scheduler
-    # num_update_steps_per_epoch = len(train_dataset) // args.train_batch_size
-    # max_steps = math.ceil(args.max_epochs * num_update_steps_per_epoch)
-    # scheduler = get_scheduler(
-    #     args.lr_scheduler,
-    #     optim,
-    #     num_warmup_steps=math.ceil(max_steps * 0.03),
-    #     num_training_steps=max_steps,
-    #     scheduler_specific_kwargs={"min_lr": args.learning_rate * 0.1},
-    # )
-    scheduler = get_scheduler(
-        "constant",
-        optim,
+    # configure Trainer
+    trainer = SelectorTrainer(
+        model=model,
+        ref_model=ref_model,
+        ref_constant=args.ref_constant,
+        strategy=strategy,
+        optim=optim,
+        train_dataloader=train_dataloader,
+        eval_dataloader=eval_dataloader,
+        new_dataloader=train_dataloader_2,
+        p=p,
+        p_opt=p_opt,
+        p_scheduler=p_scheduler, 
+        scheduler=scheduler,
+        max_norm=args.max_norm,
+        batch_size=args.train_batch_size,
+        max_epochs=args.max_epochs,
+        tokenizer=tokenizer,
     )
 
-    # strategy prepare
-    if args.ref_model and args.ref_model_2:
-        ((model, optim, scheduler), ref_model, ref_model_2) = strategy.prepare((model, optim, scheduler), ref_model, ref_model_2)
-    elif args.ref_model:
-        ((model, optim, scheduler), ref_model) = strategy.prepare((model, optim, scheduler), ref_model)
-    else:
-        model, optim, scheduler = strategy.prepare((model, optim, scheduler))
-
-    if args.load_checkpoint:
-        # ! Only printing, but not actually loading?
-        strategy.print("Load checkpoint: ", args.save_path)
-        # strategy.load_checkpoint(args.save_path + '/rm_model.pt')
-
-    os.makedirs(args.save_path, exist_ok=True)
-
-    trainer = BiObjTrainer(
-            model=model,
-            strategy=strategy,
-            tokenizer=tokenizer,
-            optim=optim,
-            train_dataloader_1=train_dataloader_1,
-            train_dataloader_2=train_dataloader_2,
-            eval_dataloader_1=eval_dataloader_1,
-            eval_dataloader_2=eval_dataloader_2,
-            scheduler=scheduler,
-            lambd=args.lambd,
-            ref_pareto_front=ref_pareto_front,
-            ref_model=ref_model,
-            ref_model_2=ref_model_2,
-        )
-
     trainer.fit(args)
+    
+    # save model checkpoint after fitting on only rank0
     if args.save_path:
         strategy.save_model(model, tokenizer, args.save_path)
+    p_tensor = trainer.p.logits
+    if strategy.is_rank_0():
+        print(p_tensor)
+        torch.save(p_tensor, "./ckpt/"+args.selector_name+"_"+ \
+                   args.selector_activation+".pt")
 
 
 if __name__ == "__main__":
@@ -357,6 +371,15 @@ if __name__ == "__main__":
         "--dpo_nll_loss_coef_2", type=float, default=0, help="Regularization with NLL loss, see LLama 3.1 tech report."
     )  
 
+    # selector arguments
+    parser.add_argument("--selector_learning_rate", type=float, default=1e-4)
+    parser.add_argument("--selector_activation", type=str, default="softmax")
+    parser.add_argument("--selector_name", type=str, default="selection_logits")
+    parser.add_argument("--ref_constant", type=float, default=0.)
+    parser.add_argument("--upperlevel_weight", type=float, default=0.9)
+    parser.add_argument("--upperlevel_weight_decay", type=float, default=0.1)
+    parser.add_argument("--selector_lr_scheduler", type=str, default="constant")
+
     ## remote logging
     # wandb pamameters
     parser.add_argument("--use_wandb", type=str, default=None)
@@ -377,5 +400,6 @@ if __name__ == "__main__":
     if args.obj_1 in ["DPO","KTO"] or args.obj_2 in ["DPO","KTO"]:
         if args.ref_model is None or args.ref_model == "":
             args.ref_model = args.pretrain
+    args.upperlevel_weight = args.lambd
 
     train(args)

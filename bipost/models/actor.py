@@ -14,6 +14,37 @@ import os
 from .ring_attn_utils import convert_ring_attn_params
 from .utils import log_probs_from_logits, reset_position_ids
 
+class TrainableTensorModule(nn.Module): #bak
+
+    """
+    Torch nn wrapped data selector.
+    """
+    
+    def __init__(self, size, activation='softmax'):
+        super(TrainableTensorModule, self).__init__()
+        
+        # Use nn.Parameter to make 'tensor' trainable
+        if activation=='softmax':
+            self.logits = nn.Parameter(torch.tensor(torch.ones(size)*0.1)).float()
+            self.activ = nn.Softmax(dim=0)
+            self.norma = size
+        elif activation=='sigmoid':
+            self.logits = nn.Parameter(torch.tensor(-torch.ones(size)*1e-4)).float()
+            self.activ = nn.Sigmoid()
+            self.norma = 2
+
+    def forward(self):
+        # You can perform operations involving 'p' in the forward method
+        # For example, you might use 'p' in a neural network layer
+        return self.norma*self.activ(self.logits) 
+    # if weight else F.log_softmax(self.logits,dim=0,dtype=torch.float32)
+
+    def negative_entropy(self):
+        # only for softmax!!
+        logp = F.log_softmax(self.logits,dim=0,dtype=torch.float32)
+        p = self.forward()
+        p = p/self.norma
+        return (p*logp).sum()
 
 class Actor(nn.Module):
     """

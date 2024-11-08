@@ -7,3 +7,4 @@ from .rm_trainer import RewardModelTrainer
 from .sft_trainer import SFTTrainer, SFT_Seq_Trainer, SFT_Pref_Trainer
 from .sft_dpo_alright_trainer import SFT_DPO_ALRIGHT_Trainer
 from .bi_objective_trainer import BiObjTrainer
+from .selector_trainer import SelectorTrainer

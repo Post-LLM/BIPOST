@@ -17,7 +17,7 @@ from torch import distributed as dist
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
-from bipost.models import Actor
+from bipost.models import Actor, TrainableTensorModule
 from bipost.utils.distributed_sampler import DistributedSampler
 
 from ..models.ring_attn_utils import get_ring_attn_group, set_ring_attn_group
@@ -26,6 +26,7 @@ from .deepspeed_utils import (
     get_eval_ds_config,
     get_optimizer_grouped_parameters,
     get_train_ds_config,
+    get_selector_train_ds_config, #bak
 )
 
 ModelOptimPair = Tuple[nn.Module, Optimizer]
@@ -198,7 +199,9 @@ class DeepspeedStrategy(ABC):
 
     def _ds_init_train_model(self, model, optim, scheduler):
         is_actor = isinstance(model, Actor)
-        ds_config = self.get_ds_train_config(is_actor)
+        is_selector = isinstance(model, TrainableTensorModule) #bak
+        assert is_selector != is_actor #bak
+        ds_config = self.get_ds_train_config(is_actor,is_selector) #bak
 
         engine, optim, _, scheduler = deepspeed.initialize(
             model=model.model if is_actor else model,
@@ -215,7 +218,7 @@ class DeepspeedStrategy(ABC):
 
         return model, optim, scheduler
 
-    def get_ds_train_config(self, is_actor):
+    def get_ds_train_config(self, is_actor, is_selector=False): #bak
         # DS Config
         ds_config = get_train_ds_config(
             offload=False,
@@ -227,6 +230,16 @@ class DeepspeedStrategy(ABC):
             grad_accum_dtype=self.grad_accum_dtype,
             disable_trace_cache=self.disable_trace_cache,
         )
+        if is_selector: #bak
+            ds_config = get_selector_train_ds_config(
+                offload=False,
+                adam_offload=self.adam_offload,
+                stage=0,
+                bf16=False,
+                max_norm=10.,
+                zpg=self.zpg,
+                grad_accum_dtype=self.grad_accum_dtype,
+                disable_trace_cache=self.disable_trace_cache,)
 
         ds_config["train_micro_batch_size_per_gpu"] = self.micro_train_batch_size
         train_batch_size = self.train_batch_size
