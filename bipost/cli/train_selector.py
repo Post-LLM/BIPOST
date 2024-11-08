@@ -243,10 +243,11 @@ def train(args):
     if args.save_path:
         strategy.save_model(model, tokenizer, args.save_path)
     p_tensor = trainer.p.logits
-    if strategy.is_rank_0():
-        print(p_tensor)
-        torch.save(p_tensor, "./ckpt/"+args.selector_name+"_"+ \
-                   args.selector_activation+".pt")
+    # todo: duplicate saving? (there is another save in fit)
+    # if strategy.is_rank_0():
+    #     print(p_tensor)
+    #     torch.save(p_tensor, "./ckpt/"+args.selector_name+"_"+ \
+    #                args.selector_activation+".pt")
 
 
 if __name__ == "__main__":
@@ -385,7 +386,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_wandb", type=str, default=None)
     parser.add_argument("--wandb_org", type=str, default=None)
     parser.add_argument("--wandb_group", type=str, default=None)
-    parser.add_argument("--wandb_project", type=str, default="bipost_alright")
+    parser.add_argument("--wandb_project", type=str, default="bipost_seal")
     parser.add_argument(
         "--wandb_run_name",
         type=str,

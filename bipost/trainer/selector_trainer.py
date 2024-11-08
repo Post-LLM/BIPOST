@@ -4,7 +4,7 @@ from abc import ABC
 import torch
 from torch import nn
 from torch.optim import Optimizer
-from torch.utils.data import DistributedSampler
+from bipost.utils.distributed_sampler import DistributedSampler
 from tqdm import tqdm
 from transformers.trainer import get_scheduler
 from bipost.models import GPTLMLoss
@@ -179,7 +179,7 @@ class SelectorTrainer(ABC):
                 step_bar.update()
                 global_step += 1
             if self.strategy.is_rank_0():
-                p_name = "./ckpt/"+args.selector_name+"_"+ args.selector_activation \
+                p_name = "./checkpoint/"+args.selector_name+"_"+ args.selector_activation \
                     +"_ep"+str(epoch+1)+".pt"
                 torch.save(self.p.logits, p_name)
                 print(self.p.logits)

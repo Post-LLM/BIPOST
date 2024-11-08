@@ -198,7 +198,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_wandb", type=str, default=None)
     parser.add_argument("--wandb_org", type=str, default=None)
     parser.add_argument("--wandb_group", type=str, default=None)
-    parser.add_argument("--wandb_project", type=str, default="bipost_train_dpo")
+    parser.add_argument("--wandb_project", type=str, default="bipost_train_kto")
     parser.add_argument(
         "--wandb_run_name",
         type=str,
