@@ -29,7 +29,11 @@ conda activate bipost
 git clone https://github.com/Post-LLM/BIPOST.git
 ```
 
-3. To install BiPOST, Navigate to the top level of the repo and run
+3. To install BiPOST, first install pytorch compatible with your cuda.
+```bash
+pip install torch==<your version>
+```
+After installing torch, navigate to the top level of the repo and run
 ```bash
 pip install -e .
 ```
